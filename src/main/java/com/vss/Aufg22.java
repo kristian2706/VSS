@@ -9,7 +9,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 
-public class ChatClient extends Application {
+public class Aufg22 extends Application {
 
     public static void main(String[] args) {
         launch(args);
