@@ -1,12 +1,16 @@
 package com.vss;
 
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.util.Pair;
 
 import java.util.Optional;
 
@@ -19,11 +23,11 @@ public class Aufg35 extends Application {
         launch(args);
     }
 
+    @Override
     public void start(Stage primaryStage) {
 
-        if (!showLoginDialog()) {
+        while (!showConnectionDialog()) {
 
-            return;
         }
 
         primaryStage.setTitle("Chat Client (" + username + " at " + server + ")");
@@ -33,79 +37,93 @@ public class Aufg35 extends Application {
         textArea.setWrapText(true);
 
         TextField textField = new TextField();
-        textField.setPrefWidth(350);
-        textField.setPrefHeight(30);
         textField.setPromptText("Enter your message");
+        textField.setPrefHeight(30);
 
-        Runnable sendMessage = () -> {
-            String message = textField.getText();
-            if (!message.trim().isEmpty()) {
-                textArea.appendText(username + ": " + message + "\n");
-                textField.clear();
-            }
-        };
-        textField.setOnAction(e -> sendMessage.run());
+        Button sendButton = new Button("Send");
 
-        Button button = new Button("Send");
-        button.setOnAction(e -> sendMessage.run());
 
-        HBox hBox = new HBox(5, textField, button);
-        BorderPane borderPane = new BorderPane();
-        borderPane.setCenter(textArea);
-        borderPane.setBottom(hBox);
+        sendButton.setOnAction(e -> sendMessage(textField, textArea));
+        textField.setOnAction(e -> sendMessage(textField, textArea));
 
-        Scene scene = new Scene(borderPane, 400, 400);
+        HBox inputBox = new HBox(5, textField, sendButton);
+
+        BorderPane layout = new BorderPane();
+        layout.setCenter(textArea);
+        layout.setBottom(inputBox);
+
+        Scene scene = new Scene(layout, 400, 400);
         primaryStage.setScene(scene);
         primaryStage.show();
     }
 
-    private boolean showLoginDialog() {
-        Dialog<String> inputDialog = new Dialog<>();
-        inputDialog.setTitle("Please enter your chat server and username");
-        VBox inputs = new VBox(10);
-        inputs.setPrefWidth(300);
+    private boolean showConnectionDialog() {
 
-        Label ipLbl = new Label("IP Address: ");
-        TextField ip_input = new TextField();
-        ip_input.setText("localhost"); // Default value
-
-        Label userLbl = new Label("Username: ");
-        TextField username_input = new TextField();
-        username_input.setText("user"); // Default value
-
-        inputs.getChildren().addAll(ipLbl, ip_input, userLbl, username_input);
-        inputDialog.getDialogPane().setContent(inputs);
-        inputDialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        Dialog<Pair<String, String>> dialog = new Dialog<>();
+        dialog.setTitle("Connection Dialog");
+        dialog.setHeaderText("Enter a username and IP Address");
 
 
-        inputDialog.setResultConverter(dialogButton -> {
-            if (dialogButton == ButtonType.OK) {
-                String serverIp = ip_input.getText().trim();
-                String userName = username_input.getText().trim();
+        ButtonType connectButtonType = new ButtonType("Connect", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(connectButtonType, ButtonType.CANCEL);
 
-                if (!serverIp.isEmpty() && !userName.isEmpty()) {
-                    server = serverIp;
-                    username = userName;
-                    return server + " " + username;
-                } else {
-                    Alert alert = new Alert(Alert.AlertType.ERROR, "Both fields are required. Please try again.", ButtonType.OK);
-                    alert.showAndWait();
-                }
-            } else if(dialogButton == ButtonType.CANCEL) {
+        // Username and IP address labels and fields
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+
+        TextField usernameField = new TextField();
+        usernameField.setPromptText("Username");
+        TextField ipAddressField = new TextField();
+        ipAddressField.setPromptText("IP Address");
+
+        grid.add(new Label("Username:"), 0, 0);
+        grid.add(usernameField, 1, 0);
+        grid.add(new Label("IP Address:"), 0, 1);
+        grid.add(ipAddressField, 1, 1);
+
+        // Enable/Disable connect button depending on whether a username was entered.
+        Node connectButton = dialog.getDialogPane().lookupButton(connectButtonType);
+        connectButton.setDisable(true);
+
+        usernameField.textProperty().addListener((observable, oldValue, newValue) -> {
+            connectButton.setDisable(newValue.trim().isEmpty() || ipAddressField.getText().trim().isEmpty());
+        });
+        ipAddressField.textProperty().addListener((observable, oldValue, newValue) -> {
+            connectButton.setDisable(newValue.trim().isEmpty() || usernameField.getText().trim().isEmpty());
+        });
+
+        dialog.getDialogPane().setContent(grid);
+
+        Platform.runLater(() -> usernameField.requestFocus());
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == connectButtonType) {
+                return new Pair<>(usernameField.getText(), ipAddressField.getText());
+            } else if (dialogButton == ButtonType.CANCEL) {
                 System.exit(0);
             }
             return null;
         });
 
+        Optional<Pair<String, String>> result = dialog.showAndWait();
 
-        Optional<String> result;
-        do {
-            result = inputDialog.showAndWait();
-            if (result.isEmpty()) {
-                return false;
-            }
-        } while (server == null || username == null);
+        result.ifPresent(usernameIpPair -> {
+            server = usernameIpPair.getValue();
+            username = usernameIpPair.getKey();
+        });
 
-        return true;
+        return result.isPresent() && server != null && username != null;
     }
+
+    private void sendMessage(TextField textField, TextArea textArea) {
+        String message = textField.getText().trim();
+        if (!message.isEmpty()) {
+            textArea.appendText(username + ": " + message + "\n");
+            textField.clear();
+        }
+    }
+
+
 }
